@@ -1,13 +1,14 @@
-#summary *eper*, some tools for Erlang Performance tuning and debugging
+#summary eper is a set of tools for Erlang Performance tuning and debugging
 
 = Introduction =
 
-Add your content here.
+Since Erlang doesn;t have a very intuitive performance model, good tools for performance tuning is a must to get the most out of your system.
 
 
 = Details =
 
-Add your content here.  Format your content with:
-  * Text in *bold* or _italic_
-  * Headings, paragraphs, and lists
-  * Automatic links to other wiki pages
+Tools that make up eper;
+  * sherk
+  * gperf
+  * dtop
+  * redbug
