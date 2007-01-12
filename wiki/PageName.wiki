@@ -2,7 +2,7 @@
 
 = Introduction =
 
-Since Erlang doesn;t have a very intuitive performance model, good tools for performance tuning is a must to get the most out of your system.
+Since Erlang doesn't have a very intuitive performance model, good tools for performance tuning is a must to get the most out of your system.
 
 
 = Details =
