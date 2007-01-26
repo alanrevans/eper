@@ -7,17 +7,19 @@
 %%%-------------------------------------------------------------------
 -module(prfHost).
 
--export([start/3, stop/1]).
+-export([start/3, stop/1,config/3]).
 -export([init/2,loop/1]).				%internal
 
--record(ld, {node, server=[], collectors, consumer, consumer_data, data=[]}).
+-record(ld, {node, server=[], collectors, config=[], 
+             consumer, consumer_data, data=[]}).
 
+-define(LOOP, ?MODULE:loop).
 -define(LOG(T), prf:log(process_info(self()),T)).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 start(Name, Node, Consumer) when atom(Name), atom(Node), atom(Consumer) -> 
     case whereis(Name) of
-	undefined -> register(Name, spawn_link(?MODULE, init, [Node,Consumer]));
+	undefined -> register(Name, spawn_link(fun()->init(Node,Consumer)end));
 	Pid -> Pid
     end.
 
@@ -25,6 +27,12 @@ stop(Name) ->
     case whereis(Name) of
         Pid when is_pid(Pid) -> Name ! {self(),stop}, receive stopped -> ok end;
         _ -> ok
+    end.
+
+config(Name,Type,Data) ->
+    case whereis(Name) of
+        Pid when is_pid(Pid) -> Pid ! {config,{Type,Data}};
+        _ -> {Name,not_running}
     end.
 
 init(Node, Consumer) ->
@@ -45,32 +53,38 @@ loop(LD) ->
 	    prf:ticker_even(),
 	    subscribe(LD#ld.node,LD#ld.collectors),
 	    Cdata = (LD#ld.consumer):tick(LD#ld.consumer_data, []),
-	    ?MODULE:loop(LD#ld{consumer_data = Cdata});
+	    ?LOOP(LD#ld{consumer_data = Cdata});
 	{timeout, _, {tick}} -> 
 	    prf:ticker_even(),
 	    {Data,NLD} = get_data(LD),
 	    Cdata = (NLD#ld.consumer):tick(NLD#ld.consumer_data, Data),
-	    ?MODULE:loop(NLD#ld{consumer_data = Cdata});
+	    ?LOOP(NLD#ld{consumer_data = Cdata});
 	{'EXIT',Pid,Reason} when Pid == LD#ld.server ->
 	    ?LOG({lost_target, Reason}),
-	    ?MODULE:loop(LD#ld{server=[]});
+	    ?LOOP(LD#ld{server=[]});
 	{'EXIT',Pid,Reason} ->
 	    ?LOG({got_EXIT, Pid, Reason}),
             do_stop(LD),
             exit({got_EXIT, Pid, Reason});
 	{subscribe, {ok, Pid}}  ->
 	    ?LOG({subscribe, {ok, node(Pid)}}),
-	    ?MODULE:loop(LD#ld{server = Pid});
+            [Pid ! {config,Data} || Data <- LD#ld.config],
+	    ?LOOP(LD#ld{server = Pid,config=[]});
 	{subscribe, {failed, R}} ->
 	    ?LOG({subscribe, {failed, R}}),
-	    ?MODULE:loop(LD);
-	{config, Data} ->
+	    ?LOOP(LD);
+	{config,{consumer, Data}} ->
 	    Cdata = (LD#ld.consumer):config(LD#ld.consumer_data, Data),
-	    ?MODULE:loop(LD#ld{consumer_data = Cdata})
+	    ?LOOP(LD#ld{consumer_data = Cdata});
+        {config,{collectors,Data}} ->
+            case LD#ld.server of
+                [] -> ?LOOP(LD#ld{config=[Data|LD#ld.config]});
+                Pid-> Pid ! {config,Data}, ?LOOP(LD)
+            end
     end.
 
 do_stop(LD) ->
-    unsubscribe(LD#ld.node,LD#ld.collectors),
+    prfTarg:unsubscribe(LD#ld.node, self()),
     (LD#ld.consumer):terminate(LD#ld.consumer_data).
 
 get_data(LD) -> 
@@ -85,9 +99,6 @@ get_datas(Node) ->
     receive {{data, Node}, Data} -> [Data|get_datas(Node)]
     after 0 -> []
     end.
-
-unsubscribe(Node, Collectors) ->
-    prfTarg:unsubscribe(Node, self(), Collectors).
 
 subscribe(Node, Collectors) ->
     Self = self(),
