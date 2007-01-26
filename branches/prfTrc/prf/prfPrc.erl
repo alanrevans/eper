@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 -module(prfPrc).
 
--export([collect/1]).
+-export([collect/1,config/2]).
 
 -import(gb_trees,[empty/0,smallest/1,lookup/2,insert/3,delete/2,to_list/1]).
 
@@ -15,6 +15,8 @@
 
 %%%reductions,message_queue_len,memory
 %%%current_function,initial_call,registered_name
+
+config(State,_ConfigData) -> State.
 
 %%% returns {State, Data}
 collect(init) -> 

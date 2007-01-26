@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 -module(prfSys).
 
--export([collect/1]).
+-export([collect/1,config/2]).
 
 -record(cst,{beam, os}).
 
@@ -19,6 +19,8 @@ collect(init) ->
     collect(#cst{beam = get_beam(Os), os = Os});
 collect(Cst = #cst{os = Os, beam = Beam}) ->
     {Cst, {?MODULE, [{node, node()}, {now, now()}|data(Os, Beam)]}}.
+
+config(State,_ConfigData) -> State.
 
 data(Os, Beam) ->
     sysi()++stat()++mem()++cpu()++smem()++get_beam(Os, Beam).

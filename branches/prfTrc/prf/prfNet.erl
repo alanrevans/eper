@@ -8,11 +8,13 @@
 %%%-------------------------------------------------------------------
 -module(prfNet).
 
--export([collect/1]).
+-export([collect/1,config/2]).
 -include_lib("kernel/include/inet.hrl").
 
 %%% returns {State, Data}
 collect(State) -> {State, {?MODULE, data()}}.
+
+config(State,_ConfigData) -> State.
 
 data() -> lists:sort(data(erlang:ports())).
 
