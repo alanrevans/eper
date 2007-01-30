@@ -55,8 +55,8 @@ loop(LD) ->
       ?LOOP(start_trace(HostPid,LD,Conf));
     {stop,{HostPid,Args}} -> 
       ?LOOP(stop_trace(HostPid,LD,Args));
-    {timeout,Timer,{die,HostPid}} -> 
-      ?LOOP(stop_trace(HostPid,LD,[{timer,Timer}]));
+    {timeout,_Timer,{die,HostPid}} -> 
+      ?LOOP(stop_trace(HostPid,LD,{timeout}));
     {'EXIT',Pid,R} ->
       ?LOOP(handle_exit(Pid,R,LD))
   end.
@@ -66,7 +66,7 @@ handle_exit(_Pid,normal,idle) ->
 handle_exit(Pid,R,LD) ->
   case {fetch(consumer,LD),fetch(host_pid,LD)} of
     {_,Pid} -> stop_trace(Pid,LD,{host_died,Pid});
-    {Pid,HostPid} -> stop_trace(HostPid,LD,{consumer_died,Pid});
+    {Pid,HostPid} -> stop_trace(HostPid,LD,{consumer_died,R});
     X -> ?LOG({wierd_exit,X,R}), LD
   end.
 
@@ -74,7 +74,7 @@ stop_trace(HostPid,idle,_Args) ->
   HostPid ! {prfTrc,{not_started,self()}},
   idle;
 stop_trace(HostPid,LD,Args) ->
-  HostPid ! {prfTrc,{stopping,self()}},
+  HostPid ! {prfTrc,{stopping,self(),Args}},
   unlink(fetch(host_pid,LD)),
   erlang:cancel_timer(fetch(timer,LD)),
   erlang:trace(all,false,fetch(flags,fetch(conf,LD))),
@@ -162,11 +162,9 @@ init_local(Conf) -> lloop({#ld{daddy=fetch(daddy,Conf),
 buffering(yes) -> [];
 buffering(no) -> no.
 
-lloop({LD,Buff,0}) ->
-  LD#ld.daddy ! stop,
-  flush(LD,Buff);
 lloop({LD,Buff,Count}) ->
-  maybe_exit(LD),
+  maybe_exit(msg_queue,LD),
+  maybe_exit(msg_count,{LD,Buff,Count}),
   receive 
     stop -> flush(LD,Buff);
     {trace_ts,Pid,Tag,A,TS} -> lloop(msg(LD,Buff,Count,{Tag,Pid,TS,A}));
@@ -174,55 +172,47 @@ lloop({LD,Buff,Count}) ->
   end.
 
 msg(LD,Buff,Count,Item) ->
-  maybe_exit(LD,Item),
+  maybe_exit(msg_size,{LD,Item}),
   {LD,buff(Buff,LD,Item),Count-1}.
 
 buff(no,LD,Item) -> send_one(LD,Item),no;
 buff(Buff,_LD,Item) -> [Item|Buff].
 
-maybe_exit(LD) ->
+maybe_exit(msg_count,{LD,Buff,0}) -> flush(LD,Buff), exit({msg_count});
+maybe_exit(msg_queue,#ld{maxqueue=MQ}) ->
   case process_info(self(),message_queue_len) of
-    {_,N} when N > LD#ld.maxqueue -> exit({msg_queue,N});
+    {_,Q} when Q > MQ -> exit({msg_queue,Q});
     _ -> ok
-  end.
+  end;
+maybe_exit(msg_size,{#ld{maxsize=MS},{call,_,_,{_,B}}}) when is_binary(B)-> 
+  case MS < (BS=size(B)) of
+    true -> exit({msg_size,BS});
+    _ -> ok
+  end;
+maybe_exit(_,_) -> ok.
 
-maybe_exit(LD,Item) -> 
-  case Item of
-    {call,_Pid,_TS,{_A,B}} when is_binary(B),LD#ld.maxsize<size(B) ->
-      exit({stack_size,size(B)});
-    _ -> 
-      ok
-  end.
-
-send_one(#ld{where=Pid},Msg) -> Pid ! [outer_t(Msg)].
+send_one(LD,Msg) -> LD#ld.where ! [msg(Msg)].
 
 flush(_,no) -> ok;
-flush(#ld{where=Pid},Buffer) -> Pid ! map(fun outer_t/1, reverse(Buffer)).
+flush(#ld{where=Pid},Buffer) -> Pid ! map(fun msg/1, reverse(Buffer)).
 
-outer_t(Msg) ->
-  case msg(Msg) of
-    {call,{MFA,Bin},PI,TS} -> {call,{MFA,Bin},PI,TS};
-    MSG -> MSG
-  end.
-
-msg({'send',Pid,TS,{Msg,To}}) ->         {'send',{Msg,pi(To)},pi(Pid),ts(TS)};
-msg({'receive',Pid,TS,Msg}) ->           {'receive',Msg,pi(Pid),ts(TS)};
-msg({'return_from',_Pid,_TS,{MFA,V}}) -> {'return',{MFA,V}};
-msg({'call',Pid,TS,{MFA,B}}) ->          {'call',{MFA,B},pi(Pid),ts(TS)};
-msg({'call',Pid,TS,MFA}) ->              {'call',{MFA,<<>>},pi(Pid),ts(TS)}.
+msg({'send',Pid,TS,{Msg,To}}) ->       {'send',{Msg,pi(To)},pi(Pid),ts(TS)};
+msg({'receive',Pid,TS,Msg}) ->         {'recv',Msg,         pi(Pid),ts(TS)};
+msg({'return_from',Pid,TS,{MFA,V}}) -> {'retn',{MFA,V},     pi(Pid),ts(TS)};
+msg({'call',Pid,TS,{MFA,B}}) ->        {'call',{MFA,B},     pi(Pid),ts(TS)};
+msg({'call',Pid,TS,MFA}) ->            {'call',{MFA,<<>>},  pi(Pid),ts(TS)}.
 
 pi(P) when pid(P) ->
   try process_info(P, registered_name) of
-      [] -> 
-      case process_info(P, initial_call) of
-        {_, {proc_lib,init_p,5}} -> proc_lib:translate_initial_call(P);
-        {_,MFA} -> MFA;
-        undefined -> dead
-      end;
+      [] -> case process_info(P, initial_call) of
+              {_, {proc_lib,init_p,5}} -> proc_lib:translate_initial_call(P);
+              {_,MFA} -> MFA;
+              undefined -> dead
+            end;
       {_,Nam} -> Nam;
       undefined -> dead
   catch 
-    Class:bad_arg -> ?LOG({class,Class}),non_local
+    error:badarg -> node(P)
   end;
 pi(P) when port(P) -> 
   {name,N} = erlang:port_info(P,name),
