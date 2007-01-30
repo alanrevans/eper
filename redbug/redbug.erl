@@ -12,7 +12,7 @@
 -export([start/3,start/4,start/5]).
 -export([stop/0]).
 
--import(lists,[foldl/3,usort/1,reverse/1,foreach/2]).
+-import(lists,[foldl/3,usort/1,reverse/1,foreach/2,flatten/1]).
 
 -define(LOG(T), prf:log(process_info(self()),T)).
 
@@ -29,57 +29,61 @@ start(Time,Msgs,Trc) -> start(Time,Msgs,Trc,all).
 start(Time,Msgs,Trc,Proc) -> start(Time,Msgs,Trc,Proc,node()).
 
 start(Time,Msgs,Trc,Proc,Targ)  -> 
-  try 
-    register(rdbg, spawn(fun init/0)),
-    rdbg ! {start,{Time,Msgs,Trc,Proc,Targ}}
-  catch C:R -> {C,R}
+  case whereis(redbug) of
+    undefined -> 
+      try 
+        register(redbug, spawn(fun init/0)),
+        redbug ! {start,{Time,Msgs,Trc,Proc,Targ}},
+        ok
+      catch C:R -> {oops,{C,R}}
+      end;
+    _ -> already_started
   end.
 
 stop() ->
-  rdbg ! {stop,[]}.
+  case whereis(redbug) of
+    undefined -> not_started;
+    Pid -> Pid ! {stop,[]}
+  end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 init() ->
   process_flag(trap_exit,true),
   receive 
     {start,{Time,Msgs,Trc,Proc,Targ}} -> 
-      Conf = pack(Time,Msgs,Trc,Proc),
-      prf:start(hygglo,Targ,redbugConsumer),
-      prf:config(hygglo,collectors,{start,{self(),Conf}}),
-      iloop()
+      try 
+        Conf = pack(Time,Msgs,Trc,Proc),
+        prf:start(prf_redbug,Targ,redbugConsumer),
+        prf:config(prf_redbug,collectors,{start,{self(),Conf}}),
+        iloop()
+      catch 
+        C:R -> ?LOG({C,R})
+      end
   end.
 
 iloop() ->
   receive
-    {prfTrc,{starting,TrcPid}} ->
-      loop(TrcPid);
-    {prfTrc,{already_started,_TrcPid}} ->
-      ?LOG(already_started);
-    {stop,Args} ->
-      prf:config(hygglo,collectors,{stop,{self(),Args}});
-    {'EXIT',Pid,R} -> 
-      ?LOG([{exited,Pid},{reason,R}]);
-    {'EXIT',R} -> 
-      ?LOG([exited,{reason,R}]);
-    X ->
-      ?LOG([{unknown_message,X}])
+    {stop,Args} -> prf:config(prf_redbug,collectors,{stop,{self(),Args}});
+    {prfTrc,{starting,TrcPid}}         -> loop(TrcPid);
+    {prfTrc,{already_started,_TrcPid}} -> ?LOG(already_started);
+    {'EXIT',Pid,R}                     -> ?LOG([{exited,Pid},{reason,R}]);
+    {'EXIT',R}                         -> ?LOG([exited,{reason,R}]);
+    X                                  -> ?LOG([{unknown_message,X}])
   end.
 
 loop(TrcPid) ->
   receive
-    {prfTrc,{stopping,TrcPid}} ->
-      ok;
-    {prfTrc,{not_started,TrcPid}} ->
-      ?LOG(not_started);
-    {stop,Args} ->
-      prf:config(hygglo,collectors,{stop,{self(),Args}});
-    {'EXIT',TrcPid,R} -> 
-      ?LOG([tracer_died,{reason,R}]);
-    {'EXIT',R} -> 
-      ?LOG([exited,{reason,R}]);
-    X ->
-      ?LOG([{unknown_message,X}])
+    {stop,Args} -> prf:config(prf_redbug,collectors,{stop,{self(),Args}});
+    {prfTrc,{stopping,TrcPid,Args}}->  stop_msg(Args);
+    {prfTrc,{not_started,TrcPid}}   -> ?LOG(not_started);
+    {'EXIT',TrcPid,R}               -> ?LOG([tracer_died,{reason,R}]);
+    {'EXIT',R}                      -> ?LOG([exited,{reason,R}]);
+    X                               -> ?LOG([{unknown_message,X}])
   end.
+
+stop_msg({timeout})                   -> io:fwrite("done: ~p~n",[timeout]);
+stop_msg({consumer_died,{msg_count}}) -> io:fwrite("done: ~p~n",[msg_count]);
+stop_msg(Args)                        -> ?LOG({stopping,Args}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Conf = {time,flags,rtps,procs,where}
@@ -135,6 +139,7 @@ strs([H|T]) -> io:fwrite("~s~n",[H]),strs(T).
 printi(Pid) ->
   erlang:monitor(process,Pid),
   printl().
+
 printl() ->
   receive
     {'DOWN',_Ref,process,_Pid,_Reason} -> ok;
@@ -144,13 +149,22 @@ printl() ->
 outer([]) -> ok;
 outer([Msg|Msgs]) ->
   case Msg of
-    {call,{MFA,Bin},PI,TS} when is_binary(Bin) ->
-      io:fwrite("~p~n",[{call,MFA,PI,TS}]),
+    {'call',{MFA,Bin},PI,TS} ->
+      io:fwrite("~s <~p> ~p~n",[ts(TS),PI,MFA]),
       foreach(fun(L)->io:fwrite("  ~p~n",[L]) end, stak(Bin));
-    MSG -> 
+    {'retn',{MFA,Val},PI,TS} -> 
+      io:fwrite("~s <~p> ~p -> ~p~n",[ts(TS),PI,MFA,Val]);
+    {'send',{MSG,To},PI,TS} -> 
+      io:fwrite("~s <~p> <~p> <<< ~p~n",[ts(TS),PI,To,MSG]);
+    {'recv',MSG,PI,TS} -> 
+      io:fwrite("~s <~p> <<< ~p~n",[ts(TS),PI,MSG]);
+    MSG ->
       io:fwrite("~p~n", [MSG])
   end,
   outer(Msgs).
+
+ts({H,M,S,_Us}) ->
+  flatten(io_lib:fwrite("~2.2.0w:~2.2.0w:~2.2.0w",[H,M,S])).
 
 %%% call stack handler
 stak(Bin) ->
@@ -178,9 +192,8 @@ mfaf(I) ->
   [_, C|_] = string:tokens(I,"()+"),
   case string:tokens(C,":/ ") of
     [M,F,A] ->
-      case catch {list_to_atom(M),list_to_atom(F),list_to_integer(A)} of
-        {'EXIT',_} -> C;
-        X -> X
+      try {list_to_atom(M),list_to_atom(F),list_to_integer(A)}
+      catch _:_ -> C
       end;
     ["unknown","function"] ->
       unknown_function
