@@ -113,7 +113,7 @@ conf_handler(Key,C,Val,LD) ->
     end,
     C#conf{val=Val}.
 
-conf_send(Key, Val) -> gperf_prf ! {config,{Key,Val}}.
+conf_send(Key, Val) -> prf:config(gperf_prf,consumer,{Key,Val}).
 
 conf_fill(Confs) -> fold(fun conf_fill/3, [], Confs).
 
