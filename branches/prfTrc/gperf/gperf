@@ -40,6 +40,11 @@ while [ -n "$1" ]
           HALT=""
 	  detach=""
 	  ;;
+      "-dbg")
+          START="-s gperf start"
+          HALT=""
+	  detach=""
+	  ;;
       "-vsn"|"-version")
 	  VSN="+R "$2
 	  shift
