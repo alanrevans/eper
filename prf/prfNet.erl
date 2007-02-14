@@ -25,8 +25,12 @@ data([P|Ports]) ->
   end.
 
 stats(P) ->
-  {ok,Stats} = inet:getstat(P),
-  Stats.
+  try Info = erlang:port_info(P),
+      {ok,Stats} = inet:getstat(P),
+      Info++Stats
+  catch _:_ ->
+      erlang:port_info(P)
+  end.
 
 name(P) -> name(erlang:port_info(P,name),P).
 
