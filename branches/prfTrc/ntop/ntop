@@ -19,7 +19,7 @@ n=3
 while [ 0 -lt "$n" ]; do SPATH=`dirname $SPATH`; let n=n-1; done
 echo SPATH $SPATH
 ERL=erl
-START="-s dtop start"
+START="-s ntop start"
 
 while [ -n "$1" ] 
   do
@@ -67,7 +67,7 @@ else
     START="$START $TARG"
 fi
 
-name="dtop_"$$
+name="ntop_"$$
 FLAGS="-boot start_sasl -sasl errlog_type error +A16"
 DISTR="-hidden -sname $name $cookie $nettick"
 
