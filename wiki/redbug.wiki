@@ -1,6 +1,6 @@
 #summary simple interface to the tracing functionality
 
-[eper]
+back to [intro]
 
 == intro ==
 
@@ -67,6 +67,8 @@ The tracer will print this;
 {luke,{shell,eval_loop,3}} -> {luke,{shell,eval_loop,3}}
 }}}
 
+`luke` (i.e. the shell) sent `true` to himself.
+
 To be neat, I stop the tracer;
 {{{
 4>exit(whereis(trip),kill).
@@ -89,3 +91,54 @@ abstraction enough.
 
 redbug aims to be a safe and simple interface to the erlang trace
 functionality. 
+
+The interface consists of the function `start`.
+
+{{{
+redbug:start(Time,Msgs,Trc[,Proc[,Targ]])
+
+Time: integer() [ms]
+Msgs: integer() [#]
+Trc: list('send'|'receive'|{M,F}|{M,F,RestrictedMatchSpecs})
+Proc: 'all'|pid()|atom(Regname)|{'pid',I2,I3}
+Targ: node()
+RestrictedMatchSpecs: list(RMS)
+RMS: 'stack'|'return'|tuple(ArgDescriptor)
+ArgDescriptor: '_'|literal()
+}}}
+
+Trace for 5000 milliseconds or until 1 trigger on `erlang:phash`
+
+`redbug:start(5000,1,{erlang,phash}).`
+
+As above, but on `erlang:phash/2`
+
+`redbug:start(5000,1,{erlang,phash,[{'_','_'}]}).
+
+As above, but second argument must be 16
+
+`redbug:start(5000,1,{erlang,phash,[{'_',16}]}).
+
+As above, but show the return value
+
+`redbug:start(5000,2,{erlang,phash,[{'_',16},return]}).
+
+As above, but show the call stack
+
+`redbug:start(5000,2,{erlang,phash,[{'_',16},stack,return]}).
+
+The output of the last command looks like this
+
+{{{
+15:59:39 <prfTrc> {erlang,phash,[time,16]}
+  {prfTrc,loop,1} 
+  {prfTrc,start_trace,3}
+  {dict,fetch,2}  
+15:59:39 <prfTrc> {erlang,phash,2} -> 6
+}}}
+
+The trigger was 
+`erlang:phash(time,16)`
+called in dict:fetch/2
+and it returned 6.
+
