@@ -11,4 +11,4 @@ Tools that make up eper;
   * sherk
   * gperf
   * dtop
-  * redbug
+  * [redbug]
