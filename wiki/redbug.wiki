@@ -1,9 +1,10 @@
 #summary simple interface to the tracing functionality
 
-= redbug =
+[eper]
 
-redbug aims to be a safe and simple interface to the erlang trace
-functionality. The erlang tracing (the so-called "trace bifs",
+== intro ==
+
+The erlang tracing (the so-called "trace bifs",
 `erlang:trace/3` and `erlang:trace_pattern/3`) are insanely
 powerful. However, they might be a bit hard to get used to.
 
@@ -78,10 +79,13 @@ solution is called `dbg`. Alas, I must recommend against using this on
 live systems, since it is way too easy to get it wrong. 
 
 Try this for a laugh (it *will* kill the node). 
+
 {{{5> dbg:tracer(),dbg:p(all,m).}}}
 
 Another problem with `dbg` is that it does not lift the level of
 abstraction enough.
 
-= Details =
+== thing look grim, what to do? ==
 
+redbug aims to be a safe and simple interface to the erlang trace
+functionality. 
