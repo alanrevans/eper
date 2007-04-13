@@ -1,0 +1,3 @@
+#summary sherk is to Erlang what shark is to MacOs X
+
+== sherk ==

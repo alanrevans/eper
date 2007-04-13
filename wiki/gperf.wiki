@@ -1,0 +1,3 @@
+#summary gperf is to Erlang what perfmeter is to Solaris
+
+== gperf ==
