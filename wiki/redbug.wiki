@@ -74,11 +74,12 @@ To be neat, I stop the tracer;
 4>exit(whereis(trip),kill).
 }}}
 
-Powerful, but not terribly user friendly.
+Clearly, a higher-level interface is in order. 
 
-So clearly, a higher-level interface is in order. The standard OTP
-solution is called `dbg`. Alas, I must recommend against using this on
-live systems, since it is way too easy to get it wrong. 
+== dbg ==
+The standard OTP solution is called `dbg`. Alas, I must recommend
+against using this on live systems, since it is way too easy to get it
+wrong.
 
 Try this for a laugh (it *will* kill the node). 
 
@@ -99,7 +100,7 @@ The safety comes partly from the simplicity, but also from the the
 fact that the redbug process works.
 
 The most interesting extra feature is probably the `stack`
-matchspec. Answers the eternal question: "Who the #$%^ is calling my
+match spec. Answers the eternal question: "Who the #$%^ is calling my
 function with #$%^ argument?"
 
 redbug supervises itself and will kill itself if it deems that it is
