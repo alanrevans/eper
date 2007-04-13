@@ -1,6 +1,6 @@
 #summary simple interface to the tracing functionality
 
-back to [intro]
+back to [intro main page]
 
 == intro ==
 
