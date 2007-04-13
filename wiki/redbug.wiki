@@ -90,13 +90,17 @@ abstraction enough.
 == things look grim, what to do? ==
 
 redbug aims to be a safe and simple interface to the erlang trace
-functionality. 
+functionality, with some extra features thrown in. 
 
 The simplicity comes from exposing only the most useful (i.e. the bits
 I use often) parts of the API in a concise way.
 
 The safety comes partly from the simplicity, but also from the the
 fact that the redbug process works.
+
+The most interesting extra feature is probably the `stack`
+matchspec. Answers the eternal question: "Who the #$%^ is calling my
+function with #$%^ argument?"
 
 redbug supervises itself and will kill itself if it deems that it is
 in danger of overloading the node. It also delays the processing of
@@ -123,19 +127,19 @@ Trace for 5000 milliseconds or until 1 trigger on `erlang:phash`
 
 As above, but on `erlang:phash/2`
 
-`redbug:start(5000,1,{erlang,phash,[{'_','_'}]}).
+`redbug:start(5000,1,{erlang,phash,[{'_','_'}]}).`
 
 As above, but second argument must be 16
 
-`redbug:start(5000,1,{erlang,phash,[{'_',16}]}).
+`redbug:start(5000,1,{erlang,phash,[{'_',16}]}).`
 
 As above, but show the return value
 
-`redbug:start(5000,2,{erlang,phash,[{'_',16},return]}).
+`redbug:start(5000,2,{erlang,phash,[{'_',16},return]}).`
 
 As above, but show the call stack
 
-`redbug:start(5000,2,{erlang,phash,[{'_',16},stack,return]}).
+`redbug:start(5000,2,{erlang,phash,[{'_',16},stack,return]}).`
 
 The output of the last command looks like this
 
