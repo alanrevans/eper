@@ -1,4 +1,4 @@
-#summary eper is a set of tools for [www.erlang.org Erlang] Performance tuning and debugging
+#summary eper is a set of tools for [http://www.erlang.org Erlang] Performance tuning and debugging
 
 = Introduction =
 
