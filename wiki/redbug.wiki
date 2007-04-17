@@ -74,7 +74,9 @@ To be neat, I stop the tracer;
 4>exit(whereis(trip),kill).
 }}}
 
-Clearly, a higher-level interface is in order. 
+The point of the above was to show
+  * the trace bifs have immense power
+  * a higher-level interface is in order
 
 == dbg ==
 The standard OTP solution is called `dbg`. Alas, I must recommend
@@ -86,7 +88,7 @@ Try this for a laugh (it *will* kill the node).
 {{{5> dbg:tracer(),dbg:p(all,m).}}}
 
 Another problem with `dbg` is that it does not lift the level of
-abstraction enough.
+abstraction enough (from that of the trace bifs).
 
 == things look grim, what to do? ==
 
@@ -96,16 +98,15 @@ functionality, with some extra features thrown in.
 The simplicity comes from exposing only the most useful (i.e. the bits
 I use often) parts of the API in a concise way.
 
-The safety comes partly from the simplicity, but also from the the
-fact that the redbug process works.
-
-The most interesting extra feature is probably the `stack`
-match spec. Answers the eternal question: "Who the #$%^ is calling my
-function with #$%^ argument?"
+The safety comes partly from the simplicity, but also from the way the redbug process works.
 
 redbug supervises itself and will kill itself if it deems that it is
 in danger of overloading the node. It also delays the processing of
 the trace messages until after the trace is done.
+
+The most interesting extra feature is probably the `stack`
+match spec. Answers the eternal question: "Who the #$%^ is calling my
+function with #$%^ argument?"
 
 == interface ==
 
@@ -171,4 +172,5 @@ actually pretty handy if you're working against an embedded system.
 bash$ redbug shad@mwux005 3000 2 "{erlang,phash}"
 16:26:00 <prfTrc> {erlang,phash,[time,16]}
 }}}
+
 
