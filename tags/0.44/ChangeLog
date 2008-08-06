@@ -1,0 +1,37 @@
+2007-11-05 Mats Cronqvist
+
+	* src/prfTarg.erl:
+	collector was called even though there were no subscribers...
+
+2007-11-02 mats cronqvist
+
+	* src/prfHost.erl:
+	linked from the wrong process
+
+2007-09-13  Mats Cronqvist
+	
+	* src/sherk.erl (flag_broken/2): probes for 'cpu_timestamp', on
+	failure falls back to 'timestamp'
+
+2007-05-17  Mats Cronqvist  <locmacr@mwlx084>
+
+	* src/sherk_ets.erl: 
+	f2t/1 (file2tab) was broken...
+
+2007-05-10  Mats Cronqvist  <locmacr@mwlx084>
+
+	* redbug/redbug.erl: 
+	somewhat more permissive api. 
+	internal changes.
+
+	* prf/prfNet.erl: 
+	turns out inet:gethostbyname hangs 5 secs if the hostname is
+	unknown. prfNet calls this 2 times per sec for every open tcp
+	port. it now memoizes the data...
+  
+2007-04-17  Mats Cronqvist  <locmacr@mwlx084>
+
+	* () this is version 0.33
+	* COPYING: MIT license
+	* INSTALL: documented the configure/build/install sequence
+
